@@ -1,0 +1,369 @@
+---
+title: "Laboratorio 7"
+author: "Jeff"
+date: "2023-10-21"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+```{r, include=FALSE}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(scales)
+library(kableExtra)
+```
+
+```{r, include=FALSE}
+# Limpieza de datos 
+datos <- read_csv("c1.csv")
+
+# Visualizar la estructura inicial de los datos
+print(head(datos))
+str(datos)
+
+# Verificar y eliminar las columnas que parecen estar vacías
+sapply(datos[c("...23", "...24", "...25", "...26", "...27", "...28")], function(columna) sum(is.na(columna)))
+datos <- datos %>%
+  select(-c("...23", "...24", "...25", "...26", "...27", "...28"))
+
+# Convertir la columna de fecha a formato de fecha
+datos <- datos %>%
+  mutate(Fecha = dmy(Fecha))
+str(datos)
+
+# Función para limpiar y convertir valores monetarios
+limpiar_moneda <- function(x) {
+  as.numeric(gsub("Q|-|,", "", x))
+}
+
+# Transformar las columnas de costos y tipo de vehículo
+procesar_vehiculo <- function(tipo, df) {
+  df %>%
+    filter(get(paste0("directo", tipo)) != "Q-") %>%
+    mutate(
+      vehiculo = tipo,
+      costo_total = get(tipo),
+      costo_directo = get(paste0("directo", tipo)),
+      costo_fijo = get(paste0("fijo", tipo))
+    ) %>%
+    select(ID, factura, Fecha, vehiculo, costo_total, costo_directo, costo_fijo)
+}
+
+datos_camion <- procesar_vehiculo("Camion_5", datos)
+datos_pickup <- procesar_vehiculo("Pickup", datos)
+datos_moto <- procesar_vehiculo("Moto", datos)
+
+# Preparar los datos para la unión
+datos <- datos %>%
+  mutate(
+    costo_total = NA,
+    costo_directo = NA,
+    costo_fijo = NA,
+    vehiculo = NA
+  )
+
+# Unir los datos de los diferentes tipos de vehículos
+unir_datos <- function(datos_principal, datos_vehiculo) {
+  datos_principal <- left_join(datos_principal, datos_vehiculo, by = c("ID", "factura", "Fecha")) %>%
+    mutate(
+      costo_total = coalesce(costo_total.x, costo_total.y),
+      costo_directo = coalesce(costo_directo.x, costo_directo.y),
+      costo_fijo = coalesce(costo_fijo.x, costo_fijo.y),
+      vehiculo = coalesce(vehiculo.x, vehiculo.y)
+    ) %>%
+    select(-ends_with(c(".x", ".y")))
+  return(datos_principal)
+}
+
+datos <- unir_datos(datos, datos_camion)
+datos <- unir_datos(datos, datos_pickup)
+datos <- unir_datos(datos, datos_moto)
+
+# Eliminar columnas que ya no se necesitan
+datos <- datos %>%
+  select(-c("Camion_5", "Pickup", "Moto", "directoCamion_5", "directoPickup", "directoMoto", "fijoCamion_5", "fijoPickup", "fijoMoto"))
+
+# Convertir los valores monetarios a un formato numérico y luego a formato de moneda
+datos <- datos %>%
+  mutate(
+    factura = limpiar_moneda(factura),
+    costo_total = limpiar_moneda(costo_total),
+    costo_directo = limpiar_moneda(costo_directo),
+    costo_fijo = limpiar_moneda(costo_fijo),
+    factura = dollar(factura, prefix = "Q"),
+    costo_total = dollar(costo_total, prefix = "Q"),
+    costo_directo = dollar(costo_directo, prefix = "Q"),
+    costo_fijo = dollar(costo_fijo, prefix = "Q")
+  )
+```
+
+```{r, include=FALSE}
+# Convertir las columnas a los tipos de datos correctos
+datos$Fecha <- as.Date(datos$Fecha, format="%Y-%m-%d")
+datos$factura <- as.numeric(gsub("Q", "", datos$factura))
+datos$costo_total <- as.numeric(gsub("Q", "", datos$costo_total))
+datos$costo_directo <- as.numeric(gsub("Q", "", datos$costo_directo))
+datos$costo_fijo <- as.numeric(gsub("Q", "", datos$costo_fijo))
+```
+
+```{r, include=FALSE}
+# Agregar columnas de año y mes
+datos$Year <- year(datos$Fecha)
+datos$Month <- month(datos$Fecha)
+```
+
+## INFORME DE ANÁLISIS Y RECOMENDACIONES PARA INVERSIONES EN ENERGÍA, S.A. DE C.V.
+
+Inversiones en Energía, S.A. de C.V. ha experimentado un año excepcional en 2017, registrando una utilidad superior a los US$1 Millón. Sin embargo, los primeros 9 meses de 2018 han sido desafiantes, con una disminución del 25% en el margen operativo en comparación con el año anterior. Este informe proporciona un análisis detallado de las operaciones de la empresa en 2017, proyecciones para 2018 y recomendaciones para lograr un crecimiento superior al 10% del año anterior en 2019.
+
+## Resumen Financiero del 2017
+```{r}
+# Convertir la columna 'Fecha' a tipo datetime
+datos <- datos %>%
+  mutate(Fecha = as.Date(Fecha))
+
+# Filtrar los datos para el año 2017
+datos_2017 <- datos %>%
+  filter(Year == 2017)
+
+# Resumen Financiero del 2017
+resumen_2017 <- datos_2017 %>%
+  summarise(
+    Ingresos_Totales = sum(factura),
+    Costos_Directos_Totales = sum(costo_directo),
+    Costos_Fijos_Totales = sum(costo_fijo),
+    Costos_Totales = sum(costo_total),
+    Utilidad = sum(factura) - sum(costo_total),
+    Tarifario_por_Unidad = mean(factura)
+  )
+
+# Estimación para el 2018
+margen_operativo_2017 <- resumen_2017$Utilidad / resumen_2017$Ingresos_Totales
+utilidad_2018_estimada <- resumen_2017$Ingresos_Totales * margen_operativo_2017 * (1 - 0.25)
+costos_2018_estimados <- resumen_2017$Ingresos_Totales - utilidad_2018_estimada
+
+resumen_2018_estimado <- data.frame(
+  Margen_Operativo_2017 = margen_operativo_2017,
+  Utilidad_2018_Estimada = utilidad_2018_estimada,
+  Costos_Totales_2018_Estimados = costos_2018_estimados
+)
+
+# Crecimiento necesario para 2019
+crecimiento_necesario <- data.frame(
+  Ingresos_Necesarios = resumen_2017$Ingresos_Totales - resumen_2017$Ingresos_Totales * (1 - 0.10),
+  Utilidad_Necesaria = resumen_2017$Utilidad - utilidad_2018_estimada * (1 + 0.10),
+  Reduccion_Costos_Necesaria = costos_2018_estimados - resumen_2017$Costos_Totales
+)
+
+# Aplicar formato de dólar y porcentaje a los resultados
+resumen_2017_formato <- resumen_2017 %>%
+  mutate(across(where(is.numeric), scales::dollar_format(prefix = "$", big.mark = ",", decimal.mark = ".", accuracy = 0.01)))
+
+resumen_2018_estimado_formato <- resumen_2018_estimado %>%
+  mutate(Margen_Operativo_2017 = scales::percent(Margen_Operativo_2017, accuracy = 0.1)) %>%
+  mutate(across(c(Utilidad_2018_Estimada, Costos_Totales_2018_Estimados), scales::dollar_format(prefix = "$", big.mark = ",", decimal.mark = ".", accuracy = 0.01)))
+
+crecimiento_necesario_formato <- crecimiento_necesario %>%
+  mutate(across(where(is.numeric), scales::dollar_format(prefix = "Q", big.mark = ",", decimal.mark = ".", accuracy = 0.01)))
+
+# Mostrar Resumen Financiero del 2017
+cat("Resumen Financiero del 2017:\n")
+cat("Ingresos Totales: ", scales::dollar(resumen_2017$Ingresos_Totales), "\n")
+cat("Costos Directos Totales: ", scales::dollar(resumen_2017$Costos_Directos_Totales), "\n")
+cat("Costos Fijos Totales: ", scales::dollar(resumen_2017$Costos_Fijos_Totales), "\n")
+cat("Costos Totales: ", scales::dollar(resumen_2017$Costos_Totales), "\n")
+cat("Utilidad: ", scales::dollar(resumen_2017$Utilidad), "\n")
+cat("Tarifario por Unidad: ", scales::dollar(resumen_2017$Tarifario_por_Unidad), " (promedio por transacción)\n")
+
+# Mostrar Estimación para el 2018
+cat("\nEstimación para el 2018:\n")
+cat("Margen Operativo en 2017: ", scales::percent(margen_operativo_2017), "\n")
+cat("Utilidad Estimada para 2018: ", scales::dollar(utilidad_2018_estimada), "\n")
+cat("Costos Totales Estimados para 2018: ", scales::dollar(costos_2018_estimados), "\n")
+
+# Mostrar Crecimiento Necesario para 2019
+cat("\nCrecimiento Necesario para 2019:\n")
+cat("Ingresos Necesarios: ", scales::dollar(crecimiento_necesario$Ingresos_Necesarios), " (10% de los ingresos de 2017)\n")
+cat("Utilidad Necesaria: ", scales::dollar(crecimiento_necesario$Utilidad_Necesaria), " (diferencia entre la utilidad de 2017 y la utilidad estimada para 2018, ajustada en un 10%)\n")
+cat("Reducción de Costos Necesaria: ", scales::dollar(crecimiento_necesario$Reduccion_Costos_Necesaria), " (diferencia entre los costos estimados para 2018 y los costos de 2017)\n")
+```
+Se compara la situación financiera estimada de 2018 con la situación financiera real del 2017. Se calcula la utilidad, los costos y los ingresos para cada año, y luego se determina el crecimiento necesario para que la empresa pueda crecer por encima del 10% con respecto al 2018. Se obtuvieron los siguientes hallazgos: 
+
+1. La empresa necesita generar al menos $3,668,809.63 adicionales en ingresos para alcanzar un crecimiento del 10% con respecto a 2018. 
+2. La empresa debería apuntar a aumentar su utilidad en $1,489,964.47 para alcanzar un crecimiento del 10% en utilidad con respecto a 2018. 
+3. Sería beneficioso reducir los costos en $2,128,519.25 para alcanzar los niveles de costos de 2017. 
+
+
+## Análisis de Tarifas por unidad en 2017
+Este análisis permitirá entender cómo se distribuyen las tarifas por unidad y si hay oportunidades para ajustarlas. 
+```{r}
+# Análisis de Tarifas por Unidad en 2017
+tarifario_2017 <- datos_2017 %>%
+  group_by(ID) %>%
+  summarise(Tarifa_Promedio = mean(factura)) %>%
+  arrange(desc(Tarifa_Promedio))
+
+# Extraer estadísticas descriptivas por separado y formatearlas
+tarifa_media <- dollar(mean(tarifario_2017$Tarifa_Promedio))
+tarifa_sd <- dollar(sd(tarifario_2017$Tarifa_Promedio))
+tarifa_min <- dollar(min(tarifario_2017$Tarifa_Promedio))
+tarifa_25 <- dollar(quantile(tarifario_2017$Tarifa_Promedio, 0.25))
+tarifa_mediana <- dollar(median(tarifario_2017$Tarifa_Promedio))
+tarifa_75 <- dollar(quantile(tarifario_2017$Tarifa_Promedio, 0.75))
+tarifa_max <- dollar(max(tarifario_2017$Tarifa_Promedio))
+
+# Combinar las estadísticas descriptivas en un solo mensaje
+mensaje_descripcion <- paste(
+  "Tarifa Promedio: ", tarifa_media,
+  "\nDesviación Estándar: ", tarifa_sd,
+  "\nMínimo: ", tarifa_min,
+  "\n25% Percentil: ", tarifa_25,
+  "\nMediana (50% Percentil): ", tarifa_mediana,
+  "\n75% Percentil: ", tarifa_75,
+  "\nMáximo: ", tarifa_max,
+  sep = ""
+)
+
+# Mostrar los 5 postes con mayores tarifas promedio y los 5 postes con menores tarifas promedio
+tarifario_2017$Tarifa_Promedio <- dollar(tarifario_2017$Tarifa_Promedio, accuracy = 0.01)
+tarifario_2017_top5 <- head(tarifario_2017, 5)
+tarifario_2017_bottom5 <- tail(tarifario_2017, 5)
+
+# Crear mensajes para los postes con las tarifas más altas y más bajas
+mensaje_top5 <- paste("Postes con las Tarifas Promedio Más Altas:\n",
+                      paste("ID ", tarifario_2017_top5$ID, ": ", tarifario_2017_top5$Tarifa_Promedio, sep = "", collapse = "\n"),
+                      sep = ""
+)
+
+mensaje_bottom5 <- paste("Postes con las Tarifas Promedio Más Bajas:\n",
+                         paste("ID ", tarifario_2017_bottom5$ID, ": ", tarifario_2017_bottom5$Tarifa_Promedio, sep = "", collapse = "\n"),
+                         sep = ""
+)
+
+cat(mensaje_descripcion, "\n\n", mensaje_top5, "\n\n", mensaje_bottom5)
+```
+
+La variabilidad en las tarifas promedio sugiere que algunos postes generan significativamente más ingresos por servicios que otros. Los postes con tarifas promedio más altas podrías ser áreas de enfoque para entender las razones detrás de estas tarifas elevadas y asegurarse de que son justificables y aceptables para los clientes. Por otro lado, los postes con tarifas promedio más bajas podrían ser revisadas para identificar oportunidades de mejora o ajuste de tarifas. Es importante considerar factores adicionales como la naturaleza del servicio, la ubicación, y la demanda para realizar mejores ajustes en las tarifas. En detalle, hay una gran dispersión en las tarifas. Hay unidades con tarifas mucho más altas o bajas que el promedio. El 25% de las unidades tienen tarifas relativamente bajas, por debajo de $101.94, lo que podría indicar oportunidades para ajustar tarifas. Sin embargo, hay que tomar en cuenta para el ajuste de tarifas que el 75% de las unidades tienen tarifas por debajo de Q166.85, lo que sugiere que la mayoría de tarifas están concentradas en un rango más bajo. 
+
+## Análisis 80-20 de Postes y Mantenimiento 
+Se identifican los postes que contribuyen al 80% de los ingresos o costos para entender mejor dónde se pueden optimizar los recursos. 
+```{r}
+# Análisis 80-20 de Postes y Mantenimiento
+# Calculando el total de facturas y costos por poste
+facturas_y_costos_por_poste <- datos_2017 %>%
+  group_by(ID) %>%
+  summarise(Total_Facturado = sum(factura), Total_Costo = sum(costo_total)) %>%
+  arrange(desc(Total_Facturado))
+
+# Calculando el 80% del total de facturas y costos
+corte_80_facturas <- sum(facturas_y_costos_por_poste$Total_Facturado) * 0.80
+corte_80_costos <- sum(facturas_y_costos_por_poste$Total_Costo) * 0.80
+
+# Identificando los postes que contribuyen al 80% de las facturas y costos
+postes_80_facturas <- facturas_y_costos_por_poste %>%
+  filter(cumsum(Total_Facturado) <= corte_80_facturas)
+
+postes_80_costos <- facturas_y_costos_por_poste %>%
+  filter(cumsum(Total_Costo) <= corte_80_costos)
+
+# Resumen del análisis 80-20
+resumen_80_20 <- data.frame(
+  Total_Postes = nrow(facturas_y_costos_por_poste),
+  Postes_80_Facturas = nrow(postes_80_facturas),
+  Porcentaje_Postes_80_Facturas = nrow(postes_80_facturas) / nrow(facturas_y_costos_por_poste) * 100,
+  Postes_80_Costos = nrow(postes_80_costos),
+  Porcentaje_Postes_80_Costos = nrow(postes_80_costos) / nrow(facturas_y_costos_por_poste) * 100
+) %>%
+  mutate(across(c(Porcentaje_Postes_80_Facturas, Porcentaje_Postes_80_Costos), scales::percent_format(scale = 1)))
+
+# Resumen del Análisis 80-20
+output <- sprintf(
+  "Resumen del Análisis 80-20:\n\nTotal de Postes: %s\nPostes Contribuyentes al 80%% de Facturas:\nCantidad: %s postes\nPorcentaje del Total de Postes: %s\nPostes Contribuyentes al 80%% de Costos:\nCantidad: %s postes\nPorcentaje del Total de Postes: %s\nPostes con Mayores Contribuciones a Facturas:\n%s",
+  scales::comma(resumen_80_20$Total_Postes),
+  scales::comma(resumen_80_20$Postes_80_Facturas),
+  resumen_80_20$Porcentaje_Postes_80_Facturas,
+  scales::comma(resumen_80_20$Postes_80_Costos),
+  resumen_80_20$Porcentaje_Postes_80_Costos,
+  paste(sapply(1:5, function(i) {
+    sprintf(
+      "ID %s: %s en facturas, %s en costos",
+      postes_80_facturas$ID[i],
+      scales::dollar(postes_80_facturas$Total_Facturado[i], prefix = "$"),
+      scales::dollar(postes_80_facturas$Total_Costo[i], prefix = "$")
+    )
+  }), collapse = "\n")
+)
+
+cat(output)
+```
+
+Aproximadamente el 47% de los postes están generando el 80% de los ingresos, mientras que el 46% de los postes están incurriendo en el 80% de los costos. Esto sugiere una distribución relativamente equitativa en términos de ingresos y costos entre los postes, pero también indica que hay un grupo significativo de postes (aproximadamente el 53-54%) que podrían no estar contribuyendo de manera eficiente a la rentabilidad de la empresa. Existe un gran número de postes que no están contribuyendo significativamente a los ingresos ni a los costos. Estos postes podrían ser evaluados para determinar si su mantenimiento y operación sigue siendo rentable o si sería más beneficioso reasignar recursos a postes de mayor rendimiento.
+
+## Eficiencia de Vehículos
+```{r}
+# Análisis de Eficiencia de Vehículos
+eficiencia_vehiculos <- datos %>%
+  group_by(vehiculo) %>%
+  summarise(
+    ServiciosRealizados = n(), 
+    CostoTotal = sum(costo_total), 
+    FacturacionTotal = sum(factura),
+    Eficiencia = sum(factura) / sum(costo_total)  # Agregando cálculo de eficiencia
+  ) %>%
+  arrange(desc(Eficiencia))  %>%  # Ordenando por eficiencia de mayor a menor
+  mutate(
+    ServiciosRealizados = scales::comma_format()(ServiciosRealizados),
+    CostoTotal = scales::dollar_format(suffix = "", decimal.mark = ".", big.mark = ",", trim = TRUE)(CostoTotal),
+    FacturacionTotal = scales::dollar_format(suffix = "", decimal.mark = ".", big.mark = ",", trim = TRUE)(FacturacionTotal),
+    Eficiencia = scales::percent_format(scale = 1, decimal.mark = ".", suffix = "%")(Eficiencia),
+    PosibleAhorro = ifelse(Eficiencia < 1, CostoTotal * (1 - Eficiencia), 0)  # Cálculo de posible ahorro
+  ) %>%
+  mutate(PosibleAhorro = scales::dollar_format(suffix = "", decimal.mark = ".", big.mark = ",", trim = TRUE)(PosibleAhorro))
+
+kable(eficiencia_vehiculos)
+```
+
+La columna llamada "Eficiencia" calcula la relación entre la facturación total y el costo total. Los vehículos se ordenan de mayor a menor eficiencia para identificar rápidamente cuáles son los más y menos eficientes. La columna "PosibleAhorro" calcula cuánto se podría ahorrar si los vehículos menos eficientes (con una eficiencia menor a 1) pudieran mejorar su eficiencia hasta alcanzar una relación de 1:1 entre facturación y costo. Esta columna proporciona una estimación directa de cuánto se podría ahorrar en costos si se mejorara la eficiencia de los vehículos menos rentables. Debido a que todos los vehículos tienen una eficiencia mayor a 1, esto significa que están generando más ingresos que costos, lo cual es una buena señal en términos de rentabilidad. Aunque esta es una situación positiva, aún podría ser útil analizar si hay oportunidades para optimizar aún más los ingresos o reducir los costos, mejorando así la rentabilidad general.
+
+## Estimación de Aumento de Ingresos
+Se calcula cuánto aumentarían los ingresos si todas las tarifas fueran por encima de la tarifa promedio. 
+
+```{r}
+# Estimación de Aumento de Ingresos
+tarifa_promedio <- 140.08
+postes_por_debajo_promedio <- datos_2017 %>% filter(factura < tarifa_promedio)
+aumento_potencial_ingresos <- sum(tarifa_promedio - postes_por_debajo_promedio$factura)
+
+cat("Aumento Potencial de Ingresos:", scales::dollar(aumento_potencial_ingresos, prefix = "$", big.mark = ","), "\n")
+```
+
+Si se ajustan todas las tarifas de los postes por debajo del promedio de $140.08 a dicho promedio, se podría obtener un aumento potencial en los ingresos de aproximadamente $6,090,013. Ajustar las tarifas al promedio puede ayudar a asegurar que los precios estén en línea con el mercado, manteniendo la competitividad de la empresa. Un precio promedio puede ser percibido como un punto medio entre calidad y costo, atrayendo a un segmento más amplio de clientes.
+
+## Resultados para 2019
+```{r}
+# Estimar los resultados para 2019 considerando solo el aumento potencial en ingresos
+ingresos_2019_ajustados <- resumen_2017$Ingresos_Totales + aumento_potencial_ingresos
+costos_2019_ajustados <- costos_2018_estimados
+utilidad_2019_estimada <- ingresos_2019_ajustados - costos_2019_ajustados
+
+# Crear un data frame con los resultados
+resultados_2019 <- data.frame(
+  Ingresos_2019_Ajustados = dollar(ingresos_2019_ajustados, prefix = "$", big.mark = ",", decimal.mark = ".", trim = TRUE),
+  Costos_2019_Ajustados = dollar(costos_2019_ajustados, prefix = "$", big.mark = ",", decimal.mark = ".", trim = TRUE),
+  Utilidad_2019_Estimada = dollar(utilidad_2019_estimada, prefix = "$", big.mark = ",", decimal.mark = ".", trim = TRUE)
+)
+
+kable(resultados_2019)
+
+```
+Con el ajuste de las tarifas de los postes se puede lograr el crecimiento deseado por encima del 10%. Esto indica un rendimiento positivo en generación de ingresos. El crecimiento en la utilidad también significa una recuperación de la disminución en 2018 y superar las expectativas de crecimiento. Sin embargo, al mantener los ingresos constantes, es importante hacer un análisis adicional para identificar más áreas donde podría haber oportunidades de reducción de costos. 
+
+## Recomendaciones
+1. Optimización de Tarifas: Departamento de Finanzas y Ventas. Realizar un análisis detallado de los postes con tarifas bajas para entender las razones detrás de estos ingresos reducidos. Evaluar la posibilidad del incremento de tarifas, asegurándose de que sigan siendo competitivas y aceptables para los clientes. 
+2. Eficiencia de Operaciones: Operaciones y Mantenimiento. Analizar las operaciones y los costos de los postes menos eficientes para implementar medidas de reducción de costos y mejorar la eficiencia operativa. 
+3. Evaluación de Servicios y Demanda: Análisis de Datos. Ajustar la oferta de servicios basándose en la demanda y las necesidades de los clientes. 
+4. Capacitación: Recursos Humanos. Implementar programas de capacitación para mantener o mejorar la eficiencia del personal encargado de los vehículos.  
