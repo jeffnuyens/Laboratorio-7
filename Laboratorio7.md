@@ -293,7 +293,7 @@ Con el ajuste de las tarifas de los postes se puede lograr el
 crecimiento deseado por encima del 10%. Esto indica un rendimiento
 positivo en generación de ingresos. El crecimiento en la utilidad
 también significa una recuperación de la disminución en 2018 y superar
-las expectativas de crecimiento. Sin embargo, al mantener los ingresos
+las expectativas de crecimiento. Sin embargo, al mantener los costos
 constantes, es importante hacer un análisis adicional para identificar
 más áreas donde podría haber oportunidades de reducción de costos.
 

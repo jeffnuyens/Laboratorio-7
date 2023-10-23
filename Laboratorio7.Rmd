@@ -360,7 +360,7 @@ resultados_2019 <- data.frame(
 kable(resultados_2019)
 
 ```
-Con el ajuste de las tarifas de los postes se puede lograr el crecimiento deseado por encima del 10%. Esto indica un rendimiento positivo en generación de ingresos. El crecimiento en la utilidad también significa una recuperación de la disminución en 2018 y superar las expectativas de crecimiento. Sin embargo, al mantener los ingresos constantes, es importante hacer un análisis adicional para identificar más áreas donde podría haber oportunidades de reducción de costos. 
+Con el ajuste de las tarifas de los postes se puede lograr el crecimiento deseado por encima del 10%. Esto indica un rendimiento positivo en generación de ingresos. El crecimiento en la utilidad también significa una recuperación de la disminución en 2018 y superar las expectativas de crecimiento. Sin embargo, al mantener los costos constantes, es importante hacer un análisis adicional para identificar más áreas donde podría haber oportunidades de reducción de costos. 
 
 ## Recomendaciones
 1. Optimización de Tarifas: Departamento de Finanzas y Ventas. Realizar un análisis detallado de los postes con tarifas bajas para entender las razones detrás de estos ingresos reducidos. Evaluar la posibilidad del incremento de tarifas, asegurándose de que sigan siendo competitivas y aceptables para los clientes. 
